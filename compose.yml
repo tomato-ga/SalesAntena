@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  python:
+    build:
+      context: .
+      dockerfile: Dockerfile
+        #command: uvicorn main:app --port 7002 --host 0.0.0.0 --log-level warning
+    environment:
+      - DATABASE_URL=postgresql://postgres:dondonbex@db:5437/postgres
+    depends_on:
+      - db
+    restart: always
+    tty: true
+    volumes:
+      - ./python:/workdir/python
+
+  db:
+    image: postgres:15.4-alpine3.18
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: dondonbex
+      TZ: Asia/Tokyo
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    ports:
+      - 5437:5432
+
+  front:
+    image: node:20.6.0-slim
+    working_dir: /workdir/front
+    tty: true
+    ports:
+      - 3000:3000
+    volumes:
+      - ./front:/workdir/front
+
+  go:
+    image: golang:1.21.1-bullseye
+    tty: true
+    restart: always
+    volumes:
+      - ./go:/workdir/go
