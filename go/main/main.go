@@ -2,6 +2,7 @@ package main
 
 import (
 	"Salesscrape/headless"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -34,9 +35,10 @@ func FeedScrape(url string) {
 }
 
 func main() {
-	// for _, url := range RssLists {
-	// 	FeedScrape(url)
-	// }
 
-	headless.Heads()
+	topUrl := headless.TimesalePage()
+	fmt.Println(topUrl)
+	fmt.Println(len(topUrl))
+
 }
+
