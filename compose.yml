@@ -30,6 +30,7 @@ services:
     image: node:20.6.0-slim
     working_dir: /workdir/front
     tty: true
+    restart: always
     ports:
       - 3000:3000
     volumes:
