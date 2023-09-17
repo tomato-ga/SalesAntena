@@ -31,6 +31,6 @@ type FeedConfig struct {
 var RssListsMap = map[string]FeedConfig{
 	"https://tokkataro.blog.jp/atom.xml": {
 		Selector: "div.article-body",
-		RemoveText: []string{"楽天市場で同じアイテムを探す", "Yahoo!ショッピングで同じアイテムを探す", "他の特価品を探す(ブログランキング)", "⇒激安特価！(blogranking)"},
+		RemoveText: []string{"●楽天市場で同じアイテムを探す", "●Yahoo!ショッピングで同じアイテムを探す", "●他の特価品を探す(ブログランキング)", "⇒激安特価！(blogranking)"},
 	},
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -33,6 +34,20 @@ func extractAmazonURL(rawURL string) (string, error) {
 
 }
 
+func transformAmazonID(urls []string) {
+	regexForASIN := regexp.MustCompile(`[A-Za-z0-9]{10}`)
+	regexForTag := regexp.MustCompile(`\w+-22`)
+
+
+	for _, url := range urls {
+		ASIN := regexForASIN.FindString(url)
+		TAG := regexForTag.FindString(url)
+	
+		newURL := strings.Replace(url, TAG, "entamenews-22", 1)
+		fmt.Println(ASIN, TAG, newURL)
+	}
+
+}
 
 func uniqueAmazonURL(amazonURLs []string) []string {
 	seen := make(map[string]bool)
@@ -72,9 +87,12 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 		content = s.Text()
 		for _, removePhrase := range config.RemoveText {
 			content = strings.ReplaceAll(content, removePhrase, "")
+			content = strings.TrimSpace(content)
+			re := regexp.MustCompile(`\s+`)
+			content = re.ReplaceAllString(content, " ")
+
 		}
 	})
-	
 
 	doc.Find("h1").Each(func(i int, s *goquery.Selection) {
 		h1 = s.Text()
@@ -112,13 +130,15 @@ func main() {
 		feed, _ := fp.ParseURL(feedURL)
 
 		// feed.Itemsが空でない場合、最初のアイテムのみを処理
-		if len(feed.Items) > 0 {
-			item := feed.Items[0]
+		// if len(feed.Items) > 0 {
+		// 	item := feed.Items[0]
 
+		for _, item := range feed.Items {
 			fmt.Println("URL:", item.Link)
 			fmt.Println("Title:", item.Title)
 
 			h1, h2, content, amazonLinks := extractAmazonLinks(item.Link, config)
+			transformAmazonID(amazonLinks)
 
 			if len(amazonLinks) > 0 {
 				fmt.Println("H1:", h1)
