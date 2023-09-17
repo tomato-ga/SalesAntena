@@ -43,11 +43,11 @@ var RssListsMap = map[string]FeedConfig{
 		RemoveText: []string{"適用", "Tweet"},
 		RemoveDiv:  []string{"button", "iframe"},
 	},
-	// "http://ks4402.blog94.fc2.com/?xml": {
-	// 	Selector:   "div.entry_body",
-	// 	RemoveText: []string{"(ブログランキング)", "ほかの特価情報(ブログランキング)", "関連記事", "⇒ほかの特価情報", "⇒"},
-	// 	RemoveDiv:  []string{"dl.relate_dl", "u"},
-	// },
+	"http://ks4402.blog94.fc2.com/?xml": {
+		Selector:   "div.entry_body",
+		RemoveText: []string{"(ブログランキング)", "ほかの特価情報(ブログランキング)", "関連記事", "⇒ほかの特価情報", "⇒"},
+		RemoveDiv:  []string{"dl.relate_dl", "u"},
+	},
 }
 
 type BlackConfig struct {

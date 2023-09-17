@@ -16,13 +16,18 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// 更新
-type AmazonKeyValuePair struct {
+type AmazonLinkDetails struct {
 	ASIN     string
 	URL      string
 	URLtitle string
 	ImageURL string
-	Content  string
+}
+
+type ArticleDetails struct {
+	ArticleURL    string
+	ArticleTitle  string
+	Content       string
+	AmazonDetails []AmazonLinkDetails
 }
 
 func extractAmazonURL(rawURL string) (string, error) {
@@ -44,14 +49,11 @@ func extractAmazonURL(rawURL string) (string, error) {
 
 }
 
-func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string, content string) []AmazonKeyValuePair {
+func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string) []AmazonLinkDetails {
 	regexForASIN := regexp.MustCompile(`[A-Za-z0-9]{10}`)
 	regexForTag := regexp.MustCompile(`\w+-22`)
 
-	var results []AmazonKeyValuePair
-
-	// ASINを重複しないようにするためのマップ
-	seenASIN := make(map[string]bool)
+	var results []AmazonLinkDetails
 
 	for index, url := range urls {
 		ASIN := regexForASIN.FindString(url)
@@ -68,16 +70,12 @@ func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string, c
 			title = urlsTitle[index]
 		}
 
-		if !seenASIN[ASIN] {
-			results = append(results, AmazonKeyValuePair{
-				ASIN:     ASIN,
-				URL:      newURL,
-				URLtitle: title, // ここで適切なタイトルを割り当てます
-				ImageURL: imageURL,
-				Content:  content,
-			})
-			seenASIN[ASIN] = true
-		}
+		results = append(results, AmazonLinkDetails{
+			ASIN:     ASIN,
+			URL:      newURL,
+			URLtitle: title,
+			ImageURL: imageURL,
+		})
 	}
 	return results
 }
@@ -95,20 +93,26 @@ func uniqueAmazonURL(amazonURLs []string) []string {
 	return result
 }
 
-func extractAmazonLinks(url string, config FeedConfig) (string, string, string, []string, []string, []string) {
+func extractAmazonLinks(url string, config FeedConfig) (string, []string, []string, []string) {
 	var content string
 	var amazonLinks []string
 	var amazonLinksTitle []string
 	var amazonImageLinks []string
-	var h1 string
-	var h2 string
 
-	resp, err := http.Get(url)
+	// User Agentの設定
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Println("Error creating request:", err)
+		return content, amazonLinks, amazonImageLinks, amazonLinksTitle
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Println("Error fetching URL:", err)
-		return h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle
+		return content, amazonLinks, amazonImageLinks, amazonLinksTitle
 	}
-	log.Println("Content-Type:", resp.Header.Get("Content-Type"))
 	defer resp.Body.Close()
 
 	var reader io.Reader
@@ -121,7 +125,7 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 	doc, err := goquery.NewDocumentFromReader(reader)
 	if err != nil {
 		log.Println("Error reading the document:", err)
-		return h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle
+		return content, amazonLinks, amazonImageLinks, amazonLinksTitle
 	}
 
 	doc.Find(config.Selector).Eq(0).Each(func(i int, s *goquery.Selection) {
@@ -139,14 +143,6 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 		}
 	})
 
-	doc.Find("h1").Each(func(i int, s *goquery.Selection) {
-		h1 = s.Text()
-	})
-
-	doc.Find("h2").Each(func(i int, s *goquery.Selection) {
-		h2 = s.Text()
-	})
-
 	// Extract amazon links
 	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
 		s.Find("a[href]").Each(func(j int, linkElement *goquery.Selection) {
@@ -162,7 +158,7 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 			}
 
 			if isBlacklested {
-				amazonLinksTitle = append(amazonLinksTitle, "タイトルなし")
+				amazonLinksTitle = append(amazonLinksTitle, "リンクテキストなし")
 			} else {
 				amazonLinksTitle = append(amazonLinksTitle, text)
 			}
@@ -184,6 +180,8 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 			imagelink, exists := ImageLinkElement.Attr("src")
 			if exists && strings.Contains(imagelink, "amazon") {
 				amazonImageLinks = append(amazonImageLinks, imagelink)
+			} else {
+				amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
 			}
 		})
 	})
@@ -191,46 +189,47 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 	// すべてのリンクが追加された後に、重複を削除
 	amazonLinks = uniqueAmazonURL(amazonLinks)
 
-	return h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle
+	return content, amazonLinks, amazonImageLinks, amazonLinksTitle
 }
 
 func main() {
 	fp := gofeed.NewParser()
 
+	var articles []ArticleDetails
+
 	for feedURL, config := range RssListsMap {
 		feed, _ := fp.ParseURL(feedURL)
 
 		for _, item := range feed.Items {
-			// fmt.Println("URL:", item.Link)
-			// fmt.Println("Title:", item.Title)
-
-			h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle := extractAmazonLinks(item.Link, config)
+			content, amazonLinks, amazonImageLinks, amazonLinksTitle := extractAmazonLinks(item.Link, config)
 
 			if len(amazonLinks) > 0 {
-				results := transformAmazonID(amazonLinks, amazonLinksTitle, amazonImageLinks, content)
+				amazonDetails := transformAmazonID(amazonLinks, amazonLinksTitle, amazonImageLinks)
 
-				for _, result := range results {
-					if result.URL == "" {
-						continue
-					}
-
-					fmt.Println(result.ASIN)
-					fmt.Println(result.URL)
-					fmt.Println(result.URLtitle)
-					fmt.Println(result.ImageURL)
-					fmt.Println(result.Content)
-					fmt.Println("-------------------------")
-
+				article := ArticleDetails{
+					ArticleURL:    item.Link,
+					ArticleTitle:  item.Title,
+					Content:       content,
+					AmazonDetails: amazonDetails,
 				}
 
-				fmt.Println("Title:", item.Title)
-				fmt.Println("URL:", item.Link)
-				fmt.Println("H1:", h1)
-				fmt.Println("H2:", h2)
-				// fmt.Println("Content:", content)
-				// fmt.Println(results)
-				fmt.Println("-------------------------")
+				articles = append(articles, article)
 			}
 		}
+	}
+
+	// ここでarticlesを使用して結果を出力
+	for _, article := range articles {
+		fmt.Println("記事タイトル: ", article.ArticleTitle)
+		fmt.Println("記事URL: ", article.ArticleURL)
+		fmt.Println("記事内容: ", article.Content)
+		fmt.Println(article.AmazonDetails)
+		// for _, amazonLink := range article.AmazonDetails {
+		// 	fmt.Println(amazonLink.ASIN)
+		// 	fmt.Println(amazonLink.URL)
+		// 	fmt.Println(amazonLink.URLtitle)
+		// 	fmt.Println(amazonLink.ImageURL)
+		// }
+		fmt.Println("-------------------------")
 	}
 }
