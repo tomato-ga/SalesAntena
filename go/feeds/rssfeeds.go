@@ -22,6 +22,7 @@ type AmazonKeyValuePair struct {
 	URL      string
 	URLtitle string
 	ImageURL string
+	Content  string
 }
 
 func extractAmazonURL(rawURL string) (string, error) {
@@ -43,7 +44,7 @@ func extractAmazonURL(rawURL string) (string, error) {
 
 }
 
-func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string) []AmazonKeyValuePair {
+func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string, content string) []AmazonKeyValuePair {
 	regexForASIN := regexp.MustCompile(`[A-Za-z0-9]{10}`)
 	regexForTag := regexp.MustCompile(`\w+-22`)
 
@@ -73,6 +74,7 @@ func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string) [
 				URL:      newURL,
 				URLtitle: title, // ここで適切なタイトルを割り当てます
 				ImageURL: imageURL,
+				Content:  content,
 			})
 			seenASIN[ASIN] = true
 		}
@@ -149,7 +151,21 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
 		s.Find("a[href]").Each(func(j int, linkElement *goquery.Selection) {
 			link, _ := linkElement.Attr("href")
-			amazonLinksTitle = append(amazonLinksTitle, linkElement.Text())
+
+			text := linkElement.Text()
+			isBlacklested := false
+			for _, blackText := range BlackList["Texts"].Black {
+				if text == blackText {
+					isBlacklested = true
+					break
+				}
+			}
+
+			if isBlacklested {
+				amazonLinksTitle = append(amazonLinksTitle, "タイトルなし")
+			} else {
+				amazonLinksTitle = append(amazonLinksTitle, text)
+			}
 
 			switch {
 			case strings.Contains(link, "amazon.co.jp"):
@@ -185,24 +201,34 @@ func main() {
 		feed, _ := fp.ParseURL(feedURL)
 
 		for _, item := range feed.Items {
-			fmt.Println("URL:", item.Link)
-			fmt.Println("Title:", item.Title)
+			// fmt.Println("URL:", item.Link)
+			// fmt.Println("Title:", item.Title)
 
 			h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle := extractAmazonLinks(item.Link, config)
 
 			if len(amazonLinks) > 0 {
-				results := transformAmazonID(amazonLinks, amazonLinksTitle, amazonImageLinks)
+				results := transformAmazonID(amazonLinks, amazonLinksTitle, amazonImageLinks, content)
 
+				for _, result := range results {
+					if result.URL == "" {
+						continue
+					}
+
+					fmt.Println(result.ASIN)
+					fmt.Println(result.URL)
+					fmt.Println(result.URLtitle)
+					fmt.Println(result.ImageURL)
+					fmt.Println(result.Content)
+					fmt.Println("-------------------------")
+
+				}
+
+				fmt.Println("Title:", item.Title)
+				fmt.Println("URL:", item.Link)
 				fmt.Println("H1:", h1)
 				fmt.Println("H2:", h2)
-				fmt.Println("Content:", content)
-				fmt.Println(results)
-
-				// for _, res := range results {
-				// 	fmt.Println("ASIN:", res.ASIN)
-				// 	fmt.Println("Amazon Link:", res.URL)
-				// 	fmt.Println("Amazon Image:", res.ImageURL)
-				// }
+				// fmt.Println("Content:", content)
+				// fmt.Println(results)
 				fmt.Println("-------------------------")
 			}
 		}
