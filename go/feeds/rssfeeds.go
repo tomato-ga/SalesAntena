@@ -16,11 +16,11 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// TODO h1, h2, h3を取得する
-
+// 更新
 type AmazonKeyValuePair struct {
 	ASIN     string
 	URL      string
+	URLtitle string
 	ImageURL string
 }
 
@@ -43,7 +43,7 @@ func extractAmazonURL(rawURL string) (string, error) {
 
 }
 
-func transformAmazonID(urls []string, imageLinks []string) []AmazonKeyValuePair {
+func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string) []AmazonKeyValuePair {
 	regexForASIN := regexp.MustCompile(`[A-Za-z0-9]{10}`)
 	regexForTag := regexp.MustCompile(`\w+-22`)
 
@@ -62,10 +62,16 @@ func transformAmazonID(urls []string, imageLinks []string) []AmazonKeyValuePair 
 			imageURL = imageLinks[index]
 		}
 
+		var title string
+		if index < len(urlsTitle) {
+			title = urlsTitle[index]
+		}
+
 		if !seenASIN[ASIN] {
 			results = append(results, AmazonKeyValuePair{
 				ASIN:     ASIN,
 				URL:      newURL,
+				URLtitle: title, // ここで適切なタイトルを割り当てます
 				ImageURL: imageURL,
 			})
 			seenASIN[ASIN] = true
@@ -87,9 +93,10 @@ func uniqueAmazonURL(amazonURLs []string) []string {
 	return result
 }
 
-func extractAmazonLinks(url string, config FeedConfig) (string, string, string, []string, []string) {
+func extractAmazonLinks(url string, config FeedConfig) (string, string, string, []string, []string, []string) {
 	var content string
 	var amazonLinks []string
+	var amazonLinksTitle []string
 	var amazonImageLinks []string
 	var h1 string
 	var h2 string
@@ -97,7 +104,7 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Println("Error fetching URL:", err)
-		return h1, h2, content, amazonLinks, amazonImageLinks
+		return h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle
 	}
 	log.Println("Content-Type:", resp.Header.Get("Content-Type"))
 	defer resp.Body.Close()
@@ -112,10 +119,15 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 	doc, err := goquery.NewDocumentFromReader(reader)
 	if err != nil {
 		log.Println("Error reading the document:", err)
-		return h1, h2, content, amazonLinks, amazonImageLinks
+		return h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle
 	}
 
 	doc.Find(config.Selector).Eq(0).Each(func(i int, s *goquery.Selection) {
+		// RemoveDivで指定された要素を削除
+		for _, divToRemove := range config.RemoveDiv {
+			s.Find(divToRemove).Remove()
+		}
+
 		content = s.Text()
 		for _, removePhrase := range config.RemoveText {
 			content = strings.ReplaceAll(content, removePhrase, "")
@@ -137,6 +149,7 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
 		s.Find("a[href]").Each(func(j int, linkElement *goquery.Selection) {
 			link, _ := linkElement.Attr("href")
+			amazonLinksTitle = append(amazonLinksTitle, linkElement.Text())
 
 			switch {
 			case strings.Contains(link, "amazon.co.jp"):
@@ -162,7 +175,7 @@ func extractAmazonLinks(url string, config FeedConfig) (string, string, string, 
 	// すべてのリンクが追加された後に、重複を削除
 	amazonLinks = uniqueAmazonURL(amazonLinks)
 
-	return h1, h2, content, amazonLinks, amazonImageLinks
+	return h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle
 }
 
 func main() {
@@ -175,10 +188,10 @@ func main() {
 			fmt.Println("URL:", item.Link)
 			fmt.Println("Title:", item.Title)
 
-			h1, h2, content, amazonLinks, amazonImageLinks := extractAmazonLinks(item.Link, config)
+			h1, h2, content, amazonLinks, amazonImageLinks, amazonLinksTitle := extractAmazonLinks(item.Link, config)
 
 			if len(amazonLinks) > 0 {
-				results := transformAmazonID(amazonLinks, amazonImageLinks)
+				results := transformAmazonID(amazonLinks, amazonLinksTitle, amazonImageLinks)
 
 				fmt.Println("H1:", h1)
 				fmt.Println("H2:", h2)
