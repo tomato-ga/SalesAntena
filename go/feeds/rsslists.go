@@ -2,8 +2,8 @@ package main
 
 var RssLists = []string{
 	// "http://tokkaban.com/feed",
-	// "https://tokkataro.blog.jp/atom.xml",
-	// "https://gekiyasu-gekiyasu.doorblog.jp/index.rdf",
+	"https://tokkataro.blog.jp/atom.xml",
+	"https://gekiyasu-gekiyasu.doorblog.jp/index.rdf",
 	// "http://buy.livedoor.biz/index.rdf",
 	// "http://ks4402.blog94.fc2.com/?xml",
 	// "http://tokkagekiyasu.blog105.fc2.com/?xml",
@@ -19,6 +19,18 @@ var RssLists = []string{
 	// "https://blog.tokka.shop/?xml",
 	// "https://webtokubai.blog.fc2.com/?xml",
 	// "https://web-price.info/atom.xml",
-	"https://tokka1147.com/feed",
-	"http://tvxtv.blog120.fc2.com/?xml",
+	// "https://tokka1147.com/feed",
+	// "http://tvxtv.blog120.fc2.com/?xml",
+}
+
+type FeedConfig struct {
+	Selector string
+	RemoveText []string
+}
+
+var RssListsMap = map[string]FeedConfig{
+	"https://tokkataro.blog.jp/atom.xml": {
+		Selector: "div.article-body",
+		RemoveText: []string{"楽天市場で同じアイテムを探す", "Yahoo!ショッピングで同じアイテムを探す", "他の特価品を探す(ブログランキング)", "⇒激安特価！(blogranking)"},
+	},
 }
