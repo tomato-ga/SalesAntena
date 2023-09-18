@@ -16,6 +16,9 @@ import (
 	"golang.org/x/text/transform"
 )
 
+// TODO RSS URLからソースを取得し、ASIN amazonURL amazonTitleを取得してから、いらないものを削除する方向でやってみる
+// TODO AmazonFetchもなくす
+
 type AmazonLinkDetails struct {
 	ASIN     string
 	URL      string
@@ -31,52 +34,91 @@ type ArticleDetails struct {
 }
 
 func extractAmazonURL(rawURL string) (string, error) {
-	parsedURL, err := url.Parse(rawURL)
+	regexPattern := `vc_url=([^&]+)`
+	re := regexp.MustCompile(regexPattern)
+	matches := re.FindStringSubmatch(rawURL)
+
+	if len(matches) < 2 {
+		return "", fmt.Errorf("vc_url parameter not found in %s", rawURL)
+	}
+
+	decodedURL, err := url.QueryUnescape(matches[1])
 	if err != nil {
 		return "", err
 	}
 
-	vcURL := parsedURL.Query().Get("vc_url")
-	if vcURL == "" {
-		return "", fmt.Errorf("vc_url not Found")
-	}
-
-	decodedURL, err := url.QueryUnescape(vcURL)
-	if err != nil {
-		return "", err
-	}
 	return decodedURL, nil
+}
 
+func ensureAmazonAffiliateID(link, affiliateID string) string {
+	// リンクがAmazonのものであるか確認
+	if strings.Contains(link, "amazon.co.jp") {
+		// 既にIDが含まれているか確認
+		if !strings.Contains(link, affiliateID) {
+			// クエリーパラメータがあるか確認
+			if strings.Contains(link, "?") {
+				link += "&tag=" + affiliateID
+			} else {
+				link += "?tag=" + affiliateID
+			}
+		}
+	}
+	return link
 }
 
 func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string) []AmazonLinkDetails {
-	regexForASIN := regexp.MustCompile(`[A-Za-z0-9]{10}`)
+	// if len(urls) == 0 || len(urlsTitle) == 0 || len(imageLinks) == 0 {
+	// 	log.Printf("Empty slice detected: urls(%d), urlsTitle(%d), imageLinks(%d)", len(urls), len(urlsTitle), len(imageLinks))
+	// 	return nil
+	// }
+	regexForASIN := regexp.MustCompile(`/([A-Z0-9]{10})`)
+	regexForTagWithEqual := regexp.MustCompile(`tag=(\w+-22)`)
 	regexForTag := regexp.MustCompile(`\w+-22`)
+
+	regexAllDigits := regexp.MustCompile(`^[0-9]{10}$`)
+	regexAllLetters := regexp.MustCompile(`^[A-Z]{10}$`)
 
 	var results []AmazonLinkDetails
 
 	for index, url := range urls {
-		ASIN := regexForASIN.FindString(url)
-		TAG := regexForTag.FindString(url)
-		newURL := strings.Replace(url, TAG, "entamenews-22", 1)
+		matches := regexForASIN.FindStringSubmatch(url)
+		if len(matches) > 1 {
+			asin := matches[1]
 
-		var imageURL string
-		if index < len(imageLinks) {
-			imageURL = imageLinks[index]
+			if regexAllDigits.MatchString(asin) || regexAllLetters.MatchString(asin) {
+				continue
+			}
+
+			TAG := ""
+
+			matchesTag := regexForTagWithEqual.FindStringSubmatch(url)
+			if len(matchesTag) > 1 {
+				TAG = matchesTag[1]
+			} else {
+				matchesTag2 := regexForTag.FindStringSubmatch(url)
+				if len(matchesTag2) > 0 {
+					TAG = matchesTag2[0]
+				}
+			}
+
+			if TAG != "" && TAG != "entamenews-22" {
+				url = strings.Replace(url, TAG, "entamenews-22", 1)
+			}
+
+			newURL := ensureAmazonAffiliateID(url, "entamenews-22")
+
+			imageURL := imageLinks[index]
+			title := urlsTitle[index]
+
+			results = append(results, AmazonLinkDetails{
+				ASIN:     asin,
+				URL:      newURL,
+				URLtitle: title,
+				ImageURL: imageURL,
+			})
 		}
-
-		var title string
-		if index < len(urlsTitle) {
-			title = urlsTitle[index]
-		}
-
-		results = append(results, AmazonLinkDetails{
-			ASIN:     ASIN,
-			URL:      newURL,
-			URLtitle: title,
-			ImageURL: imageURL,
-		})
 	}
+
 	return results
 }
 
@@ -91,6 +133,47 @@ func uniqueAmazonURL(amazonURLs []string) []string {
 		}
 	}
 	return result
+}
+
+func cleanContent(url string, content string, removeText []string, removeDiv []string) string {
+	content = strings.TrimSpace(content)
+	re := regexp.MustCompile(`\s+`)
+	content = re.ReplaceAllString(content, " ")
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
+	if err == nil {
+		if strings.HasPrefix(url, "https://tokkataro.blog.jp") {
+			// Starting from the first removal tag, remove everything thereafter
+			for _, removePhrase := range removeText {
+				doc.Find(":contains('" + removePhrase + "')").Each(func(_ int, sel *goquery.Selection) {
+					sel.Remove()
+					sel.NextAll().Remove()
+				})
+			}
+
+		} else {
+			for _, removePhrase := range removeText {
+				doc.Find("a").Each(func(i int, selection *goquery.Selection) {
+					if strings.Contains(selection.Text(), removePhrase) {
+						selection.Remove()
+					}
+				})
+			}
+			// removeDiv's processing is applied to all URLs
+			for _, selector := range removeDiv {
+				doc.Find(selector).Each(func(i int, selection *goquery.Selection) {
+					selection.Remove()
+				})
+			}
+		}
+		content, _ = doc.Find("body").First().Html()
+		re := regexp.MustCompile(`<[^>]*>`)
+		content = re.ReplaceAllString(content, "") // Remove all HTML tags
+		content = strings.TrimSpace(content)
+		content = re.ReplaceAllString(content, " ")
+	}
+
+	return content
 }
 
 func extractAmazonLinks(url string, config FeedConfig) (string, []string, []string, []string) {
@@ -128,19 +211,22 @@ func extractAmazonLinks(url string, config FeedConfig) (string, []string, []stri
 		return content, amazonLinks, amazonImageLinks, amazonLinksTitle
 	}
 
-	doc.Find(config.Selector).Eq(0).Each(func(i int, s *goquery.Selection) {
+	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
 		// RemoveDivで指定された要素を削除
 		for _, divToRemove := range config.RemoveDiv {
 			s.Find(divToRemove).Remove()
 		}
 
 		content = s.Text()
+
+		// RemoveTextの各項目に基づいて、該当テキストを単に削除
 		for _, removePhrase := range config.RemoveText {
 			content = strings.ReplaceAll(content, removePhrase, "")
-			content = strings.TrimSpace(content)
-			re := regexp.MustCompile(`\s+`)
-			content = re.ReplaceAllString(content, " ")
 		}
+
+		content = strings.TrimSpace(content)
+		re := regexp.MustCompile(`\s+`)
+		content = re.ReplaceAllString(content, " ")
 	})
 
 	// Extract amazon links
@@ -178,43 +264,83 @@ func extractAmazonLinks(url string, config FeedConfig) (string, []string, []stri
 
 		s.Find("img").Each(func(j int, ImageLinkElement *goquery.Selection) {
 			imagelink, exists := ImageLinkElement.Attr("src")
-			if exists && strings.Contains(imagelink, "amazon") {
-				amazonImageLinks = append(amazonImageLinks, imagelink)
-			} else {
-				amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
+			if exists {
+				// 拡張子の確認
+				isImageExtension := regexp.MustCompile(`\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?.*)?$`).MatchString(imagelink)
+				if isImageExtension && strings.Contains(imagelink, "amazon") {
+					amazonImageLinks = append(amazonImageLinks, imagelink)
+				} else {
+					amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
+				}
 			}
 		})
 	})
 
-	// すべてのリンクが追加された後に、重複を削除
-	amazonLinks = uniqueAmazonURL(amazonLinks)
+	maxLength := max(len(amazonLinks), len(amazonImageLinks), len(amazonLinksTitle))
+
+	for len(amazonLinks) < maxLength {
+		amazonLinks = append(amazonLinks, "リンクなし")
+	}
+	for len(amazonImageLinks) < maxLength {
+		amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
+	}
+	for len(amazonLinksTitle) < maxLength {
+		amazonLinksTitle = append(amazonLinksTitle, "リンクテキストなし")
+	}
 
 	return content, amazonLinks, amazonImageLinks, amazonLinksTitle
 }
 
+func max(nums ...int) int {
+	max := nums[0]
+	for _, n := range nums {
+		if n > max {
+			max = n
+		}
+	}
+	return max
+}
+
 func main() {
 	fp := gofeed.NewParser()
-
 	var articles []ArticleDetails
 
 	for feedURL, config := range RssListsMap {
 		feed, _ := fp.ParseURL(feedURL)
 
 		for _, item := range feed.Items {
-			content, amazonLinks, amazonImageLinks, amazonLinksTitle := extractAmazonLinks(item.Link, config)
+			rawContent, amazonLinks, amazonImageLinks, amazonLinksTitle := extractAmazonLinks(item.Link, config)
 
-			if len(amazonLinks) > 0 {
-				amazonDetails := transformAmazonID(amazonLinks, amazonLinksTitle, amazonImageLinks)
+			// cleanContent関数を使用してコンテンツをクリーンアップ
+			cleanedContent := cleanContent(item.Link, rawContent, config.RemoveText, config.RemoveDiv)
 
-				article := ArticleDetails{
-					ArticleURL:    item.Link,
-					ArticleTitle:  item.Title,
-					Content:       content,
-					AmazonDetails: amazonDetails,
-				}
-
-				articles = append(articles, article)
+			article := ArticleDetails{
+				ArticleTitle:  item.Title,
+				ArticleURL:    item.Link,
+				Content:       cleanedContent,
+				AmazonDetails: transformAmazonID(amazonLinks, amazonImageLinks, amazonLinksTitle),
 			}
+
+			// AmazonDetailsをフィルタリング
+			var filteredAmazonDetails []AmazonLinkDetails
+			for _, detail := range article.AmazonDetails {
+				shouldRemove := false
+				for _, removePhrase := range config.RemoveText {
+					if strings.Contains(detail.ASIN, removePhrase) ||
+						strings.Contains(detail.URL, removePhrase) ||
+						strings.Contains(detail.URLtitle, removePhrase) {
+						shouldRemove = true
+						break
+					}
+				}
+				if !shouldRemove {
+					filteredAmazonDetails = append(filteredAmazonDetails, detail)
+				}
+			}
+			article.AmazonDetails = filteredAmazonDetails
+
+			// articles スライスに追加
+			articles = append(articles, article)
 		}
 	}
 
@@ -224,12 +350,7 @@ func main() {
 		fmt.Println("記事URL: ", article.ArticleURL)
 		fmt.Println("記事内容: ", article.Content)
 		fmt.Println(article.AmazonDetails)
-		// for _, amazonLink := range article.AmazonDetails {
-		// 	fmt.Println(amazonLink.ASIN)
-		// 	fmt.Println(amazonLink.URL)
-		// 	fmt.Println(amazonLink.URLtitle)
-		// 	fmt.Println(amazonLink.ImageURL)
-		// }
-		fmt.Println("-------------------------")
+
+		fmt.Println("=========================")
 	}
 }

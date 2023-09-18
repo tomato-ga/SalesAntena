@@ -5,10 +5,7 @@ var RssLists = []string{
 	// "https://tokkataro.blog.jp/atom.xml",
 	// "https://gekiyasu-gekiyasu.doorblog.jp/index.rdf",
 	// "http://buy.livedoor.biz/index.rdf",
-	"http://ks4402.blog94.fc2.com/?xml",
-	"http://tokkagekiyasu.blog105.fc2.com/?xml",
-	"http://digitalcamera3.blog56.fc2.com/?xml",
-	"http://tvxtv.blog120.fc2.com/?xml",
+	// "http://ks4402.blog94.fc2.com/?xml",
 	"https://webtokubai.blog.fc2.com/?xml",
 	"http://feeds.feedburner.com/919cc",
 	"https://iitokimowaruitokimo.com/feed",
@@ -33,20 +30,27 @@ var RssListsMap = map[string]FeedConfig{
 	// "https://tokkataro.blog.jp/atom.xml": {
 	// 	Selector:   "div.article-body",
 	// 	RemoveText: []string{"●楽天市場で同じアイテムを探す", "●Yahoo!ショッピングで同じアイテムを探す", "●他の特価品を探す(ブログランキング)", "⇒激安特価！(blogranking)"},
+	// 	RemoveDiv:  []string{""},
 	// },
 	// "https://gekiyasu-gekiyasu.doorblog.jp/index.rdf": {
 	// 	Selector:   "div.main",
 	// 	RemoveText: []string{"人気ブログランキング"},
+	// 	RemoveDiv:  []string{""},
 	// },
-	"http://buy.livedoor.biz/index.rdf": {
-		Selector:   "div.main", // div.mainが二つある
-		RemoveText: []string{"適用", "Tweet"},
-		RemoveDiv:  []string{"button", "iframe"},
-	},
-	"http://ks4402.blog94.fc2.com/?xml": {
-		Selector:   "div.entry_body",
-		RemoveText: []string{"(ブログランキング)", "ほかの特価情報(ブログランキング)", "関連記事", "⇒ほかの特価情報", "⇒"},
-		RemoveDiv:  []string{"dl.relate_dl", "u"},
+	// "http://buy.livedoor.biz/index.rdf": {
+	// 	Selector:   "div.main", // div.mainが二つある
+	// 	RemoveText: []string{"適用", "Tweet"},
+	// 	RemoveDiv:  []string{"button", "iframe"},
+	// },
+	// "http://ks4402.blog94.fc2.com/?xml": {
+	// 	Selector:   "div.entry_body",
+	// 	RemoveText: []string{"ブログランキング", "ほかの特価情報(ブログランキング)", "関連記事", "⇒ほかの特価情報", "⇒"},
+	// 	RemoveDiv:  []string{"dl.relate_dl", "u"},
+	// },
+	"https://webtokubai.blog.fc2.com/?xml": {
+		Selector:   "div.section",
+		RemoveText: []string{"⇒", "(blogranking)", "blogranking", "ブログランキング", "⇒タイムセール情報(blogranking)", "⇒この商品を楽天市場で探す", "⇒この商品をYahoo!ショッピングで探す"},
+		RemoveDiv:  []string{"div.entry-footer"},
 	},
 }
 
