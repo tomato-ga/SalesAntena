@@ -30,19 +30,22 @@ func cleanContent(url string, content string, removeText []string, removeDiv []s
 			// Starting from the first removal tag, remove everything thereafter
 			for _, removePhrase := range removeText {
 				doc.Find(":contains('" + removePhrase + "')").Each(func(_ int, sel *goquery.Selection) {
-					sel.Remove()
+					sel.SetText(strings.ReplaceAll(sel.Text(), removePhrase, ""))
 					sel.NextAll().Remove()
 				})
 			}
-
 		} else {
 			for _, removePhrase := range removeText {
 				doc.Find("a").Each(func(i int, selection *goquery.Selection) {
 					if strings.Contains(selection.Text(), removePhrase) {
+						selection.SetText(strings.ReplaceAll(selection.Text(), removePhrase, ""))
 						selection.Remove()
+					} else {
+						selection.SetText(strings.ReplaceAll(selection.Text(), removePhrase, ""))
 					}
 				})
 			}
+
 			// removeDiv's processing is applied to all URLs
 			for _, selector := range removeDiv {
 				doc.Find(selector).Each(func(i int, selection *goquery.Selection) {
@@ -50,7 +53,6 @@ func cleanContent(url string, content string, removeText []string, removeDiv []s
 				})
 			}
 		}
-
 	}
 
 	content = doc.Text()
