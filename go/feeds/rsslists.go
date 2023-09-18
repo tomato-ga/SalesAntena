@@ -49,7 +49,7 @@ var RssListsMap = map[string]FeedConfig{
 	// },
 	"https://webtokubai.blog.fc2.com/?xml": {
 		Selector:   "div.section",
-		RemoveText: []string{"⇒", "(blogranking)", "blogranking", "ブログランキング", "⇒タイムセール情報(blogranking)", "⇒この商品を楽天市場で探す", "⇒この商品をYahoo!ショッピングで探す"},
+		RemoveText: []string{"⇒", "blogranking", "ブログランキング", "この商品を楽天市場で探す", "この商品をYahoo!ショッピングで探す"},
 		RemoveDiv:  []string{"div.entry-footer"},
 	},
 }
