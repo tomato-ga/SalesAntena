@@ -15,6 +15,7 @@ func main() {
 		feed, _ := fp.ParseURL(feedURL)
 
 		for _, item := range feed.Items {
+//amazon urlを取得する前に、div要素を取得するだけの関数を用意する
 			rawContent, amazonLinks, amazonImageLinks, amazonLinksTitle := extractAmazonLinks(item.Link, config)
 
 			// cleanContent関数を使用してコンテンツをクリーンアップ
