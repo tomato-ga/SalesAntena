@@ -69,7 +69,6 @@ func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string) [
 			if regexAllDigits.MatchString(asin) || regexAllLetters.MatchString(asin) {
 				continue
 			}
-
 			TAG := ""
 
 			matchesTag := regexForTagWithEqual.FindStringSubmatch(url)
