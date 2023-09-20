@@ -29,7 +29,7 @@ type FeedConfig struct {
 var RssListsMap = map[string]FeedConfig{
 	"https://webtokubai.blog.fc2.com/?xml": {
 		Selector:   "div.section",
-		RemoveText: []string{""},
+		RemoveText: []string{"⇒", "blogranking", "ブログランキング", "この商品を楽天市場で探す", "この商品をYahoo!ショッピングで探す"},
 		RemoveDiv:  []string{"div.entry-footer"},
 	},
 }

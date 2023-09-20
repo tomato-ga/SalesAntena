@@ -47,12 +47,8 @@ func ensureAmazonAffiliateID(link, affiliateID string) string {
 	return link
 }
 
-func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string) []AmazonLinkDetails {
-	// if len(urls) == 0 || len(urlsTitle) == 0 || len(imageLinks) == 0 {
-	// 	log.Printf("Empty slice detected: urls(%d), urlsTitle(%d), imageLinks(%d)", len(urls), len(urlsTitle), len(imageLinks))
-	// 	return nil
-	// }
-	regexForASIN := regexp.MustCompile(`/([A-Z0-9]{10})`)
+func transformAmazonID(details []AmazonLinkDetails) []AmazonLinkDetails {
+	regexForASIN := regexp.MustCompile(`/dp/([A-Z0-9]{10})`)
 	regexForTagWithEqual := regexp.MustCompile(`tag=(\w+-22)`)
 	regexForTag := regexp.MustCompile(`\w+-22`)
 
@@ -61,42 +57,37 @@ func transformAmazonID(urls []string, urlsTitle []string, imageLinks []string) [
 
 	var results []AmazonLinkDetails
 
-	for index, url := range urls {
+	for _, detail := range details {
+		url := detail.URL
 		matches := regexForASIN.FindStringSubmatch(url)
+		asin := "ASINなし" // デフォルト値としてASINなしを設定
 		if len(matches) > 1 {
-			asin := matches[1]
-
-			if regexAllDigits.MatchString(asin) || regexAllLetters.MatchString(asin) {
-				continue
+			asinCandidate := matches[1]
+			if !regexAllDigits.MatchString(asinCandidate) && !regexAllLetters.MatchString(asinCandidate) {
+				asin = asinCandidate
 			}
-			TAG := ""
-
-			matchesTag := regexForTagWithEqual.FindStringSubmatch(url)
-			if len(matchesTag) > 1 {
-				TAG = matchesTag[1]
-			} else {
-				matchesTag2 := regexForTag.FindStringSubmatch(url)
-				if len(matchesTag2) > 0 {
-					TAG = matchesTag2[0]
-				}
-			}
-
-			if TAG != "" && TAG != "entamenews-22" {
-				url = strings.Replace(url, TAG, "entamenews-22", 1)
-			}
-
-			newURL := ensureAmazonAffiliateID(url, "entamenews-22")
-
-			imageURL := imageLinks[index]
-			title := urlsTitle[index]
-
-			results = append(results, AmazonLinkDetails{
-				ASIN:     asin,
-				URL:      newURL,
-				URLtitle: title,
-				ImageURL: imageURL,
-			})
 		}
+		detail.ASIN = asin
+
+		TAG := ""
+		matchesTag := regexForTagWithEqual.FindStringSubmatch(url)
+		if len(matchesTag) > 1 {
+			TAG = matchesTag[1]
+		} else {
+			matchesTag2 := regexForTag.FindStringSubmatch(url)
+			if len(matchesTag2) > 0 {
+				TAG = matchesTag2[0]
+			}
+		}
+
+		if TAG != "" && TAG != "entamenews-22" {
+			url = strings.Replace(url, TAG, "entamenews-22", 1)
+		}
+
+		newURL := ensureAmazonAffiliateID(url, "entamenews-22")
+		detail.URL = newURL
+
+		results = append(results, detail)
 	}
 
 	return results

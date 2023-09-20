@@ -39,7 +39,7 @@ func cleanContent(url string, content string, removeText []string, removeDiv []s
 				doc.Find("a").Each(func(i int, selection *goquery.Selection) {
 					if strings.Contains(selection.Text(), removePhrase) {
 						selection.SetText(strings.ReplaceAll(selection.Text(), removePhrase, ""))
-						// selection.Remove()
+						selection.Remove()
 					} else {
 						selection.SetText(strings.ReplaceAll(selection.Text(), removePhrase, ""))
 					}
@@ -57,6 +57,35 @@ func cleanContent(url string, content string, removeText []string, removeDiv []s
 
 	content = doc.Text()
 	return content
+}
+
+func removeUnwantedElements(doc *goquery.Document, config FeedConfig) {
+	// テキストの削除
+	for _, unwantedText := range config.RemoveText {
+		// aタグ内のテキストの処理
+		doc.Find("a").Each(func(i int, s *goquery.Selection) {
+			if strings.Contains(s.Text(), unwantedText) {
+				s.SetText(strings.ReplaceAll(s.Text(), unwantedText, ""))
+				s.Remove()
+			} else {
+				s.SetText(strings.ReplaceAll(s.Text(), unwantedText, ""))
+			}
+		})
+
+		// その他の要素内のテキストの処理
+		doc.Find("p").Each(func(i int, s *goquery.Selection) {
+			if strings.Contains(s.Text(), unwantedText) {
+				s.SetText(strings.ReplaceAll(s.Text(), unwantedText, ""))
+			}
+		})
+	}
+
+	// 特定のdiv要素の削除
+	for _, unwantedDiv := range config.RemoveDiv {
+		doc.Find(unwantedDiv).Each(func(i int, s *goquery.Selection) {
+			s.Remove()
+		})
+	}
 }
 
 func extractContentFromURL(url string, config FeedConfig) (*goquery.Document, string) {
@@ -98,55 +127,48 @@ func extractContentFromURL(url string, config FeedConfig) (*goquery.Document, st
 		content = re.ReplaceAllString(content, " ")
 	})
 
+	// 不要な要素の削除
+	removeUnwantedElements(doc, config)
 	return doc, content
 }
 
-// TODO データの流れが分かっていないから処理がこんがらがる
-func extractAmazonLinksFromDoc(doc *goquery.Document, config FeedConfig) ([]string, []string, []string) {
-	var amazonLinks []string
-	var amazonLinksTitle []string
-	var amazonImageLinks []string
+func extractAmazonLinksFromDoc(doc *goquery.Document, config FeedConfig) ArticleDetails {
+	var article ArticleDetails
 
 	// Extract amazon links
 	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
 		s.Find("a[href]").Each(func(j int, linkElement *goquery.Selection) {
 			link, _ := linkElement.Attr("href")
 			text := linkElement.Text()
-			isBlacklested := false
+			isBlacklisted := false
 			for _, blackText := range BlackList["Texts"].Black {
 				if text == blackText {
-					isBlacklested = true
+					isBlacklisted = true
 					break
 				}
 			}
 
-			if isBlacklested {
-				amazonLinksTitle = append(amazonLinksTitle, "リンクテキストなし")
+			amazonDetail := AmazonLinkDetails{}
+			if isBlacklisted {
+				amazonDetail.URLtitle = "リンクテキストなし"
 			} else {
-				amazonLinksTitle = append(amazonLinksTitle, text)
+				amazonDetail.URLtitle = text
 			}
 
 			switch {
 			case strings.Contains(link, "amazon.co.jp"):
-				amazonLinks = append(amazonLinks, link)
+				amazonDetail.URL = link
 			case strings.Contains(link, "amzn"):
-				amazonLinks = append(amazonLinks, link)
+				amazonDetail.URL = link
 			case strings.Contains(link, "valuecommerce"):
 				amazonURL, err := extractAmazonURL(link)
 				if err == nil && (strings.Contains(amazonURL, "amazon.co.jp") || strings.Contains(amazonURL, "amzn")) {
-					amazonLinks = append(amazonLinks, amazonURL)
+					amazonDetail.URL = amazonURL
 				}
 			default:
-				amazonLinks = append(amazonLinks, "リンクなし")
+				amazonDetail.URL = "リンクなし"
 			}
-
-			// Ensure all slices have the same length
-			for len(amazonLinks) > len(amazonImageLinks) {
-				amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
-			}
-			for len(amazonLinks) > len(amazonLinksTitle) {
-				amazonLinksTitle = append(amazonLinksTitle, "リンクテキストなし")
-			}
+			article.AmazonDetails = append(article.AmazonDetails, amazonDetail)
 		})
 
 		s.Find("img").Each(func(j int, ImageLinkElement *goquery.Selection) {
@@ -154,137 +176,18 @@ func extractAmazonLinksFromDoc(doc *goquery.Document, config FeedConfig) ([]stri
 			if exists {
 				isImageExtension := regexp.MustCompile(`\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?.*)?$`).MatchString(imagelink)
 				if isImageExtension && strings.Contains(imagelink, "amazon") {
-					amazonImageLinks = append(amazonImageLinks, imagelink)
-				} else {
-					amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
+					if j < len(article.AmazonDetails) {
+						article.AmazonDetails[j].ImageURL = imagelink
+					} else {
+						amazonDetail := AmazonLinkDetails{
+							ImageURL: imagelink,
+						}
+						article.AmazonDetails = append(article.AmazonDetails, amazonDetail)
+					}
 				}
-			} else {
-				amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
-			}
-
-			// Ensure all slices have the same length
-			for len(amazonImageLinks) > len(amazonLinks) {
-				amazonLinks = append(amazonLinks, "リンクなし")
-			}
-			for len(amazonImageLinks) > len(amazonLinksTitle) {
-				amazonLinksTitle = append(amazonLinksTitle, "リンクテキストなし")
 			}
 		})
 	})
 
-	return amazonLinks, amazonImageLinks, amazonLinksTitle
+	return article
 }
-
-// func extractAmazonLinks(url string, config FeedConfig) (string, []string, []string, []string) {
-// 	var content string
-// 	var amazonLinks []string
-// 	var amazonLinksTitle []string
-// 	var amazonImageLinks []string
-
-// 	// User Agentの設定
-// 	req, err := http.NewRequest("GET", url, nil)
-// 	if err != nil {
-// 		log.Println("Error creating request:", err)
-// 		return content, amazonLinks, amazonImageLinks, amazonLinksTitle
-// 	}
-// 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
-
-// 	client := &http.Client{}
-// 	resp, err := client.Do(req)
-// 	if err != nil {
-// 		log.Println("Error fetching URL:", err)
-// 		return content, amazonLinks, amazonImageLinks, amazonLinksTitle
-// 	}
-// 	defer resp.Body.Close()
-
-// 	var reader io.Reader
-// 	if resp.Header.Get("Content-Type") == "text/html; charset=euc-jp" {
-// 		reader = transform.NewReader(resp.Body, japanese.EUCJP.NewDecoder())
-// 	} else {
-// 		reader = resp.Body
-// 	}
-
-// 	doc, err := goquery.NewDocumentFromReader(reader)
-// 	if err != nil {
-// 		log.Println("Error reading the document:", err)
-// 		return content, amazonLinks, amazonImageLinks, amazonLinksTitle
-// 	}
-
-// 	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
-// 		content, _ = s.Html()
-// 		content = strings.TrimSpace(content)
-// 		re := regexp.MustCompile(`\s+`)
-// 		content = re.ReplaceAllString(content, " ")
-// 	})
-
-// 	// Extract amazon links
-// 	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
-// 		s.Find("a[href]").Each(func(j int, linkElement *goquery.Selection) {
-// 			link, _ := linkElement.Attr("href")
-
-// 			text := linkElement.Text()
-// 			isBlacklested := false
-// 			for _, blackText := range BlackList["Texts"].Black {
-// 				if text == blackText {
-// 					isBlacklested = true
-// 					break
-// 				}
-// 			}
-
-// 			if isBlacklested {
-// 				amazonLinksTitle = append(amazonLinksTitle, "リンクテキストなし")
-// 			} else {
-// 				amazonLinksTitle = append(amazonLinksTitle, text)
-// 			}
-
-// 			switch {
-// 			case strings.Contains(link, "amazon.co.jp"):
-// 				amazonLinks = append(amazonLinks, link)
-// 			case strings.Contains(link, "amzn"):
-// 				amazonLinks = append(amazonLinks, link)
-// 			case strings.Contains(link, "valuecommerce"):
-// 				amazonURL, err := extractAmazonURL(link)
-// 				if err == nil && (strings.Contains(amazonURL, "amazon.co.jp") || strings.Contains(amazonURL, "amzn")) {
-// 					amazonLinks = append(amazonLinks, amazonURL)
-// 				}
-// 			}
-// 		})
-
-// 		s.Find("img").Each(func(j int, ImageLinkElement *goquery.Selection) {
-// 			imagelink, exists := ImageLinkElement.Attr("src")
-// 			if exists {
-// 				// 拡張子の確認
-// 				isImageExtension := regexp.MustCompile(`\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?.*)?$`).MatchString(imagelink)
-// 				if isImageExtension && strings.Contains(imagelink, "amazon") {
-// 					amazonImageLinks = append(amazonImageLinks, imagelink)
-// 				} else {
-// 					amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
-// 				}
-// 			}
-// 		})
-// 	})
-
-// 	maxLength := max(len(amazonLinks), len(amazonImageLinks), len(amazonLinksTitle))
-
-// 	for len(amazonLinks) < maxLength {
-// 		amazonLinks = append(amazonLinks, "リンクなし")
-// 	}
-// 	for len(amazonImageLinks) < maxLength {
-// 		amazonImageLinks = append(amazonImageLinks, "アマゾン画像なし")
-// 	}
-// 	for len(amazonLinksTitle) < maxLength {
-// 		amazonLinksTitle = append(amazonLinksTitle, "リンクテキストなし")
-// 	}
-
-// 	return content, amazonLinks, amazonImageLinks, amazonLinksTitle
-// }
-
-// func max(nums ...int) int {
-// 	max := nums[0]
-// 	for _, n := range nums {
-// 		if n > max {
-// 			max = n
-// 		}
-// 	}
-// 	return max
-// }

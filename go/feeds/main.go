@@ -14,14 +14,13 @@ func main() {
 		feed, _ := fp.ParseURL(feedURL)
 
 		for _, item := range feed.Items {
-			// まず、URLからコンテンツを抽出する
+			// URLからコンテンツを抽出する
 			doc, rawContent := extractContentFromURL(item.Link, config)
+			
+			// ドキュメントからAmazonのリンクを抽出
+			art := extractAmazonLinksFromDoc(doc, config)
 
-			// 次に、そのドキュメントからAmazonのリンクを抽出
-			amazonLinks, amazonImageLinks, amazonLinksTitle := extractAmazonLinksFromDoc(doc, config)
-			fmt.Println("extractAmazonLinks--------")
-			fmt.Println(amazonLinks)
-
+			amazonDetails := transformAmazonID(art.AmazonDetails)
 			// cleanContent関数を使用してコンテンツをクリーンアップ
 			cleanedContent := cleanContent(item.Link, rawContent, config.RemoveText, config.RemoveDiv)
 
@@ -29,22 +28,18 @@ func main() {
 				ArticleTitle:  item.Title,
 				ArticleURL:    item.Link,
 				Content:       cleanedContent,
-				AmazonDetails: transformAmazonID(amazonLinks, amazonImageLinks, amazonLinksTitle),
+				AmazonDetails: amazonDetails,
 			}
-
-			// articles スライスに追加
 			articles = append(articles, article)
 		}
 	}
+	for _, artic := range articles {
+		fmt.Println("--------------------------------------")
+		fmt.Println("タイトル", artic.ArticleTitle)
+		fmt.Println("URL", artic.ArticleURL)
+		fmt.Println("アマゾンディティール", artic.AmazonDetails)
+		fmt.Println("記事内容", artic.Content)
+		fmt.Println("--------------------------------------")
 
-	// ここでarticlesを使用して結果を出力
-	for _, article := range articles {
-		fmt.Println("構造体--------")
-
-		// fmt.Println("記事タイトル: ", article.ArticleTitle)
-		// fmt.Println("記事URL: ", article.ArticleURL)
-		// fmt.Println("記事内容: ", article.Content)
-		fmt.Println(article.AmazonDetails)
-		fmt.Println("=========================")
 	}
 }
