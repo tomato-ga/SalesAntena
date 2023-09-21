@@ -19,7 +19,7 @@ type ArticleDetails struct {
 	AmazonDetails []AmazonLinkDetails
 }
 
-func cleanContent(url string, content string, removeText []string, removeDiv []string) string {
+func cleanContent(url string, content string, config FeedConfig) string {
 	content = strings.TrimSpace(content)
 	re := regexp.MustCompile(`\s+`)
 	content = re.ReplaceAllString(content, " ")
@@ -28,33 +28,31 @@ func cleanContent(url string, content string, removeText []string, removeDiv []s
 	if err == nil {
 		if strings.HasPrefix(url, "https://tokkataro.blog.jp") {
 			// Starting from the first removal tag, remove everything thereafter
-			for _, removePhrase := range removeText {
+			for _, removePhrase := range config.RemoveText {
 				doc.Find(":contains('" + removePhrase + "')").Each(func(_ int, sel *goquery.Selection) {
 					sel.SetText(strings.ReplaceAll(sel.Text(), removePhrase, ""))
 					sel.NextAll().Remove()
 				})
 			}
 		} else {
-			for _, removePhrase := range removeText {
+			for _, removePhrase := range config.RemoveText {
+				// aタグに含まれているテキストを削除
 				doc.Find("a").Each(func(i int, selection *goquery.Selection) {
 					if strings.Contains(selection.Text(), removePhrase) {
-						selection.SetText(strings.ReplaceAll(selection.Text(), removePhrase, ""))
 						selection.Remove()
-					} else {
-						selection.SetText(strings.ReplaceAll(selection.Text(), removePhrase, ""))
 					}
 				})
-			}
 
-			// removeDiv's processing is applied to all URLs
-			for _, selector := range removeDiv {
-				doc.Find(selector).Each(func(i int, selection *goquery.Selection) {
-					selection.Remove()
+				// プレーンテキストを削除
+				doc.Find(":contains('" + removePhrase + "')").Each(func(i int, s *goquery.Selection) {
+					html, _ := s.Html()
+					updatedHtml := strings.ReplaceAll(html, removePhrase, "")
+					s.SetHtml(updatedHtml)
 				})
 			}
 		}
-	}
 
+	}
 	content = doc.Text()
 	return content
 }
