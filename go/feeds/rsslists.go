@@ -34,6 +34,16 @@ var RssListsMap = map[string]FeedConfig{
 		RemoveDiv:     []string{"div.entry-footer"},
 		RemoveAllText: []string{"この商品を楽天市場で探す"},
 	},
+	"https://gekiyasu-gekiyasu.doorblog.jp/index.rdf": {
+		Selector:   "div.main", // div.mainmoreというのが存在するので、Selectorもスライスで管理がよさそう
+		RemoveText: []string{"人気ブログランキング"},
+		RemoveDiv:  []string{""},
+	},
+	// "https://tokkataro.blog.jp/atom.xml": {
+	// 	Selector:   "div.article-body",
+	// 	RemoveText: []string{"●楽天市場で同じアイテムを探す", "●Yahoo!ショッピングで同じアイテムを探す", "●他の特価品を探す(ブログランキング)", "⇒激安特価！(blogranking)"},
+	// 	RemoveDiv:  []string{""},
+	// },
 }
 
 // "⇒", "blogranking", "ブログランキング", "この商品を楽天市場で探す", "この商品をYahoo!ショッピングで探す"

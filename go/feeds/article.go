@@ -126,7 +126,7 @@ func extractContentFromURL(url string, config FeedConfig) (*goquery.Document, st
 	})
 
 	// 不要な要素の削除
-	removeUnwantedElements(doc, config)
+	// removeUnwantedElements(doc, config)
 	return doc, content
 }
 

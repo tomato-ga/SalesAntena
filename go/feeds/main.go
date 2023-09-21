@@ -10,13 +10,14 @@ import (
 func main() {
 	fp := gofeed.NewParser()
 	var articles []ArticleDetails
-	limitcount := 0
 
 	for feedURL, config := range RssListsMap {
+		limitcount := 0
+
 		feed, _ := fp.ParseURL(feedURL)
 
 		for _, item := range feed.Items {
-			if limitcount >= 3 {
+			if limitcount >= 4 {
 				break
 			}
 
