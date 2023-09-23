@@ -26,6 +26,7 @@ type ProductPage struct {
 	Price              string
 	ProductDescription string
 	Zaiko              bool
+	Review             string
 }
 
 func NewAmazonBrowser() (*AmazonBrowser, error) {
@@ -49,7 +50,7 @@ func (ab *AmazonBrowser) TimesalePage() ([]string, []string, error) {
 	var topDealUrls []string
 	viewIndex := 0
 
-	for len(topProductUrls) < 2000 {
+	for len(topProductUrls) < 200 {
 		pageURL := fmt.Sprintf("https://www.amazon.co.jp/gp/goldbox?viewIndex=%d", viewIndex)
 		ab.Page.MustNavigate(pageURL)
 		ab.Page.MustWaitLoad()
@@ -70,12 +71,20 @@ func (ab *AmazonBrowser) TimesalePage() ([]string, []string, error) {
 			case strings.Contains(*url, "/dp") && !contains(topProductUrls, *url):
 				topProductUrls = append(topProductUrls, *url)
 			case strings.Contains(*url, "/deal") && !contains(topDealUrls, *url):
-				topDealUrls = append(topDealUrls, *url)
+				if len(topDealUrls) < 10 { // この条件を追加して、topDealUrlsの長さが10未満の場合のみ追加します
+					topDealUrls = append(topDealUrls, *url)
+				}
 			}
 
-			if len(topProductUrls) >= 30 {
-				return topProductUrls, topDealUrls, nil
+			// 10件のtopDealUrlsに達したら、ループを終了します
+			if len(topDealUrls) >= 10 {
+				break
 			}
+		}
+
+		// 10件のtopDealUrlsに達したら、外部ループも終了します
+		if len(topDealUrls) >= 10 {
+			break
 		}
 
 		viewIndex += 60
@@ -175,14 +184,14 @@ func (ab *AmazonBrowser) ProductGetHTMLtags(url string) (ProductPage, error) {
 	extractProductDescription := func() (string, error) {
 		Descrip, err := ab.Page.ElementX(`//div[@id='productDescription']`)
 		if err != nil {
-			return "", err
+			return "商品説明なし", err
 		}
 		DescripText := Descrip.MustText()
 
 		if len(DescripText) > 0 {
 			return DescripText, nil
 		}
-		return "", nil
+		return "商品説明なし", nil
 	}
 	descriptionText, _ := extractProductDescription()
 
@@ -223,6 +232,7 @@ func (ab *AmazonBrowser) DealPageURLs(dealURLs []string) (map[string][]string, e
 			}
 		}
 		dealToProducts[dealURL] = productURLsForDeal
+
 	}
 	return dealToProducts, nil
 }
