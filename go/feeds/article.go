@@ -118,12 +118,14 @@ func extractContentFromURL(url string, config FeedConfig) (*goquery.Document, st
 		return nil, content
 	}
 
-	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
-		content, _ = s.Html()
-		content = strings.TrimSpace(content)
-		re := regexp.MustCompile(`\s+`)
-		content = re.ReplaceAllString(content, " ")
-	})
+	for _, Selector := range config.Selector {
+		doc.Find(Selector).Each(func(i int, s *goquery.Selection) {
+			content, _ = s.Html()
+			content = strings.TrimSpace(content)
+			re := regexp.MustCompile(`\s+`)
+			content = re.ReplaceAllString(content, " ")
+		})
+	}
 
 	// 不要な要素の削除
 	// removeUnwantedElements(doc, config)
@@ -134,58 +136,72 @@ func extractAmazonLinksFromDoc(doc *goquery.Document, config FeedConfig) Article
 	var article ArticleDetails
 
 	// Extract amazon links
-	doc.Find(config.Selector).Each(func(i int, s *goquery.Selection) {
-		s.Find("a[href]").Each(func(j int, linkElement *goquery.Selection) {
-			link, _ := linkElement.Attr("href")
-			text := linkElement.Text()
-			isBlacklisted := false
-			for _, blackText := range BlackList["Texts"].Black {
-				if text == blackText {
-					isBlacklisted = true
-					break
-				}
-			}
-
-			amazonDetail := AmazonLinkDetails{}
-			if isBlacklisted {
-				amazonDetail.URLtitle = "リンクテキストなし"
-			} else {
-				amazonDetail.URLtitle = text
-			}
-
-			switch {
-			case strings.Contains(link, "amazon.co.jp"):
-				amazonDetail.URL = link
-			case strings.Contains(link, "amzn"):
-				amazonDetail.URL = link
-			case strings.Contains(link, "valuecommerce"):
-				amazonURL, err := extractAmazonURL(link)
-				if err == nil && (strings.Contains(amazonURL, "amazon.co.jp") || strings.Contains(amazonURL, "amzn")) {
-					amazonDetail.URL = amazonURL
-				}
-			default:
-				amazonDetail.URL = "リンクなし"
-			}
-			article.AmazonDetails = append(article.AmazonDetails, amazonDetail)
-		})
-
-		s.Find("img").Each(func(j int, ImageLinkElement *goquery.Selection) {
-			imagelink, exists := ImageLinkElement.Attr("src")
-			if exists {
-				isImageExtension := regexp.MustCompile(`\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?.*)?$`).MatchString(imagelink)
-				if isImageExtension && strings.Contains(imagelink, "amazon") {
-					if j < len(article.AmazonDetails) {
-						article.AmazonDetails[j].ImageURL = imagelink
-					} else {
-						amazonDetail := AmazonLinkDetails{
-							ImageURL: imagelink,
-						}
-						article.AmazonDetails = append(article.AmazonDetails, amazonDetail)
+	for _, Selector := range config.Selector {
+		doc.Find(Selector).Each(func(i int, s *goquery.Selection) {
+			s.Find("a[href]").Each(func(j int, linkElement *goquery.Selection) {
+				link, _ := linkElement.Attr("href")
+				text := linkElement.Text()
+				isBlacklisted := false
+				for _, blackText := range BlackList["Texts"].Black {
+					if text == blackText {
+						isBlacklisted = true
+						break
 					}
 				}
-			}
+
+				amazonDetail := AmazonLinkDetails{}
+				if isBlacklisted {
+					amazonDetail.URLtitle = "リンクテキストなし"
+				} else {
+					amazonDetail.URLtitle = text
+				}
+
+				switch {
+				case strings.Contains(link, "amazon.co.jp"):
+					amazonDetail.URL = link
+				case strings.Contains(link, "amzn"):
+					amazonDetail.URL = link
+				case strings.Contains(link, "valuecommerce"):
+					amazonURL, err := extractAmazonURL(link)
+					if err == nil && (strings.Contains(amazonURL, "amazon.co.jp") || strings.Contains(amazonURL, "amzn")) {
+						amazonDetail.URL = amazonURL
+					}
+				default:
+					amazonDetail.URL = "リンクなし"
+				}
+				article.AmazonDetails = append(article.AmazonDetails, amazonDetail)
+			})
+
+			s.Find("img").Each(func(j int, ImageLinkElement *goquery.Selection) {
+				imagelink, exists := ImageLinkElement.Attr("src")
+				if exists {
+					isImageExtension := regexp.MustCompile(`\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?.*)?$`).MatchString(imagelink)
+					if isImageExtension {
+						if strings.Contains(imagelink, "amazon") {
+							if j < len(article.AmazonDetails) {
+								article.AmazonDetails[j].ImageURL = imagelink
+							} else {
+								amazonDetail := AmazonLinkDetails{
+									ImageURL: imagelink,
+								}
+								article.AmazonDetails = append(article.AmazonDetails, amazonDetail)
+							}
+						} else {
+							// imagelinkに"amazon"が含まれていない場合
+							if j < len(article.AmazonDetails) {
+								article.AmazonDetails[j].ImageURL = "画像なし"
+							} else {
+								amazonDetail := AmazonLinkDetails{
+									ImageURL: "画像なし",
+								}
+								article.AmazonDetails = append(article.AmazonDetails, amazonDetail)
+							}
+						}
+					}
+				}
+			})
 		})
-	})
+	}
 
 	return article
 }

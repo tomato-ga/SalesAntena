@@ -6,7 +6,7 @@ var RssLists = []string{
 	// "https://gekiyasu-gekiyasu.doorblog.jp/index.rdf",
 	// "http://buy.livedoor.biz/index.rdf",
 	// "http://ks4402.blog94.fc2.com/?xml",
-	"https://webtokubai.blog.fc2.com/?xml",
+	// "https://webtokubai.blog.fc2.com/?xml",
 	"http://feeds.feedburner.com/919cc",
 	"https://iitokimowaruitokimo.com/feed",
 	"https://gekiyasu.blog/feed",
@@ -21,28 +21,45 @@ var RssLists = []string{
 }
 
 type FeedConfig struct {
-	Selector      string
+	Selector      []string
 	RemoveText    []string
 	RemoveDiv     []string
 	RemoveAllText []string
 }
 
 var RssListsMap = map[string]FeedConfig{
-	"https://webtokubai.blog.fc2.com/?xml": {
-		Selector:      "div.section",
-		RemoveText:    []string{"⇒", "blogranking", "ブログランキング"},
-		RemoveDiv:     []string{"div.entry-footer"},
-		RemoveAllText: []string{"この商品を楽天市場で探す"},
-	},
-	"https://gekiyasu-gekiyasu.doorblog.jp/index.rdf": {
-		Selector:   "div.main", // div.mainmoreというのが存在するので、Selectorもスライスで管理がよさそう
-		RemoveText: []string{"人気ブログランキング"},
-		RemoveDiv:  []string{""},
-	},
+	// "https://webtokubai.blog.fc2.com/?xml": {
+	// 	Selector:      []string{"div.section"},
+	// 	RemoveText:    []string{"⇒", "blogranking", "ブログランキング"},
+	// 	RemoveDiv:     []string{"div.entry-footer"},
+	// 	RemoveAllText: []string{"この商品を楽天市場で探す"},
+	// },
+	// "https://gekiyasu-gekiyasu.doorblog.jp/index.rdf": {
+	// 	Selector:   []string{"div.main", "div.mainmore"}, // div.mainmoreというのが存在するので、Selectorもスライスで管理がよさそう
+	// 	RemoveText: []string{"人気ブログランキング"},
+	// 	RemoveDiv:  []string{""},
+	// },
 	// "https://tokkataro.blog.jp/atom.xml": {
-	// 	Selector:   "div.article-body",
+	// 	Selector:   []string{"div.article-body"},
 	// 	RemoveText: []string{"●楽天市場で同じアイテムを探す", "●Yahoo!ショッピングで同じアイテムを探す", "●他の特価品を探す(ブログランキング)", "⇒激安特価！(blogranking)"},
 	// 	RemoveDiv:  []string{""},
+	// },
+	// "http://buy.livedoor.biz/index.rdf": {
+	// 	Selector:   []string{"div.main"}, // div.mainが二つある
+	// 	RemoveText: []string{"適用", "Tweet"},
+	// 	RemoveDiv:  []string{"button", "iframe"},
+	// },
+	"https://iitokimowaruitokimo.com/feed": {
+		Selector:      []string{"div.entry-content"},
+		RemoveText:    []string{""},
+		RemoveDiv:     []string{""},
+		RemoveAllText: []string{""},
+	},
+
+	// "http://ks4402.blog94.fc2.com/?xml": {
+	// 	Selector:   []string{"div.entry_body"},
+	// 	RemoveText: []string{""}, //"ブログランキング", "関連記事", "⇒ほかの特価情報", "⇒"
+	// 	RemoveDiv:  []string{"dl.relate_dl"},
 	// },
 }
 

@@ -17,7 +17,7 @@ func main() {
 		feed, _ := fp.ParseURL(feedURL)
 
 		for _, item := range feed.Items {
-			if limitcount >= 4 {
+			if limitcount >= 3 {
 				break
 			}
 
@@ -56,8 +56,8 @@ func main() {
 		fmt.Println("--------------------------------------")
 		fmt.Println("タイトル:\n", artic.ArticleTitle)
 		fmt.Println("URL:\n", artic.ArticleURL)
-		fmt.Println("アマゾンディティール:\n\n", artic.AmazonDetails)
-		fmt.Println("記事内容:\n", artic.Content)
+		fmt.Println("アマゾン構造体:\n\n", artic.AmazonDetails)
+		fmt.Println("記事内容:\n\n", artic.Content)
 		fmt.Println("--------------------------------------")
 
 	}
