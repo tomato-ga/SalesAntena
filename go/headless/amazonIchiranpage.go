@@ -18,10 +18,14 @@ type AmazonBrowser struct {
 }
 
 type ProductPage struct {
-	ASIN        string
-	ProductName string
-	ImageURL    string
-	AffURL      string
+	ASIN               string
+	ProductName        string
+	ImageURL           string
+	AffURL             string
+	PriceOff           string
+	Price              string
+	ProductDescription string
+	Zaiko              bool
 }
 
 func NewAmazonBrowser() (*AmazonBrowser, error) {
@@ -63,15 +67,12 @@ func (ab *AmazonBrowser) TimesalePage() ([]string, []string, error) {
 
 			// /dpと/dealのURLで分別する
 			switch {
-			case strings.Contains(*url, "/dp"):
+			case strings.Contains(*url, "/dp") && !contains(topProductUrls, *url):
 				topProductUrls = append(topProductUrls, *url)
-			case strings.Contains(*url, "/deal"):
+			case strings.Contains(*url, "/deal") && !contains(topDealUrls, *url):
 				topDealUrls = append(topDealUrls, *url)
 			}
 
-			if url != nil && *url != "" && !contains(topProductUrls, *url) {
-				topProductUrls = append(topProductUrls, *url)
-			}
 			if len(topProductUrls) >= 30 {
 				return topProductUrls, topDealUrls, nil
 			}
@@ -84,7 +85,6 @@ func (ab *AmazonBrowser) TimesalePage() ([]string, []string, error) {
 	return topProductUrls, topDealUrls, nil
 }
 
-// TODO 割引率・%を抽出する
 func (ab *AmazonBrowser) ProductGetHTMLtags(url string) (ProductPage, error) {
 	ab.Page.MustNavigate(url)
 	ab.Page.MustWaitLoad()
@@ -107,9 +107,9 @@ func (ab *AmazonBrowser) ProductGetHTMLtags(url string) (ProductPage, error) {
 	}
 	h1Text := h1Element.MustText()
 
-	// 画像URL取得
 	extractImageURL := func() (string, error) {
-		imgElements, err := ab.Page.Elements("img")
+		// divタグのクラスがimgTagWrapperで、その子要素として<img>タグが存在する要素を検索
+		imgElements, err := ab.Page.ElementsX(`//div[@class="imgTagWrapper"]/img`)
 		if err != nil {
 			return "", err
 		}
@@ -132,20 +132,76 @@ func (ab *AmazonBrowser) ProductGetHTMLtags(url string) (ProductPage, error) {
 	// affurlを生成
 	Affurl := url + "&tag=entamenews-22"
 
+	// 割引きを抽出
+	extractPriceoff := func() (string, error) {
+		// 割引きの正規表現
+		rePrice := regexp.MustCompile(`-\d+%`)
+
+		priceOffElements, err := ab.Page.ElementsX(`//div[contains(@class, 'a-section')]/span`)
+		if err != nil {
+			return "", err
+		}
+
+		for _, priceOffElement := range priceOffElements {
+			priceOffText := priceOffElement.MustText()
+			if rePrice.MatchString(priceOffText) {
+				return priceOffText, nil
+			}
+		}
+		return "割引きなし", nil
+	}
+	priceOfftext, _ := extractPriceoff()
+
+	// 値段を抽出
+	extractPrice := func() (string, error) {
+		rePrice := regexp.MustCompile(`￥([\d,]+)`)
+
+		priceElements, err := ab.Page.ElementsX(`//span[@class='a-offscreen']`)
+		if err != nil {
+			return "", err
+		}
+
+		for _, priceElement := range priceElements {
+			priceText := priceElement.MustText()
+			if rePrice.MatchString(priceText) {
+				return priceText, nil
+			}
+		}
+		return "値段なし", nil
+	}
+	priceText, _ := extractPrice()
+
+	// 商品説明テキストか画像を抽出
+	extractProductDescription := func() (string, error) {
+		Descrip, err := ab.Page.ElementX(`//div[@id='productDescription']`)
+		if err != nil {
+			return "", err
+		}
+		DescripText := Descrip.MustText()
+
+		if len(DescripText) > 0 {
+			return DescripText, nil
+		}
+		return "", nil
+	}
+	descriptionText, _ := extractProductDescription()
+
 	ab.Product = ProductPage{
-		ASIN:        asin,
-		ProductName: h1Text,
-		ImageURL:    ImgURL,
-		AffURL:      Affurl,
+		ASIN:               asin,
+		ProductName:        h1Text,
+		ImageURL:           ImgURL,
+		AffURL:             Affurl,
+		PriceOff:           priceOfftext,
+		Price:              priceText,
+		ProductDescription: descriptionText,
+		Zaiko:              priceOfftext != "" || priceText != "",
 	}
 
 	return ab.Product, nil
 }
 
-
-// TODO Dealのページ情報は、情報をまとめて一枚のページに出す
-func (ab *AmazonBrowser) DealPageURLs(dealURLs []string) ([]string, error) {
-	var productURLs []string
+func (ab *AmazonBrowser) DealPageURLs(dealURLs []string) (map[string][]string, error) {
+	dealToProducts := make(map[string][]string)
 
 	for _, dealURL := range dealURLs {
 		ab.Page.MustNavigate(dealURL)
@@ -155,19 +211,20 @@ func (ab *AmazonBrowser) DealPageURLs(dealURLs []string) ([]string, error) {
 			return nil, err
 		}
 
+		var productURLsForDeal []string
 		for _, aElement := range aElements {
 			url, err := aElement.Attribute("href")
 			if err != nil {
 				return nil, err
 			}
-			if url != nil && *url != "" && !contains(productURLs, *url) {
+			if url != nil && *url != "" && !contains(productURLsForDeal, *url) {
 				completeURL := "https://www.amazon.co.jp" + *url
-				productURLs = append(productURLs, completeURL)
+				productURLsForDeal = append(productURLsForDeal, completeURL)
 			}
 		}
+		dealToProducts[dealURL] = productURLsForDeal
 	}
-
-	return productURLs, nil
+	return dealToProducts, nil
 }
 
 func contains(slice []string, item string) bool {

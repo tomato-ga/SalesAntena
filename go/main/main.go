@@ -4,11 +4,18 @@ import (
 	"Salesscrape/headless"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 )
 
 func main() {
 	fmt.Println("---スタート---")
+
+	// 0.7秒から1.5秒の間のランダムなスリープ時間を取得
+	randomFloat := 0.7 + rand.Float64()*(1.5-0.7)
+	sleepDuration := time.Duration(randomFloat * float64(time.Second))
+	// スリープ
+	time.Sleep(sleepDuration)
 
 	ab, err := headless.NewAmazonBrowser()
 	if err != nil {
@@ -27,34 +34,41 @@ func main() {
 	fmt.Println("---DEAL---")
 	fmt.Println(len(topDealUrls))
 
-	// dealページから商品ページURLを取得
+	// dealページから商品ページURL/dpを取得 -> mapでdealURL[商品URL]が戻り値になる
 	productURLS, err := ab.DealPageURLs(topDealUrls)
 	if err != nil {
 		fmt.Println("Error fetching timesale page", err)
 		return
 	}
 
-	// 商品ページURLを合体させる→合体必要ない
 	// TODO 単体商品ページと、Dealの商品ページ（複数商品まとめて掲載）は、別の処理をしてDBに保存する
-	mixedProductURLs := append(topProductUrls, productURLS...)
+	// 商品ページの情報抽出(Deal以外の商品単体ページの処理)
+	for _, url := range topProductUrls {
 
-	// 商品ページの情報抽出
-	for _, url := range mixedProductURLs {
-		Product, err := ab.ProductGetHTMLtags(url)
+		if strings.Contains(url, "/dp") {
+			Product, err := ab.ProductGetHTMLtags(url)
 
-		// 0.7秒から1.5秒の間のランダムなスリープ時間を取得
-		randomFloat := 0.7 + rand.Float64()*(1.5-0.7)
-		sleepDuration := time.Duration(randomFloat * float64(time.Second))
-
-		// スリープ
-		time.Sleep(sleepDuration)
-
-		if err != nil {
-			fmt.Println("Error fetching H1 text", err)
+			if err != nil {
+				fmt.Println("ProductGetHTMLタグでエラー発生", err)
+			}
+			// スリープ
+			time.Sleep(sleepDuration)
+			// TODO 商品単体ページの情報を一つずつDBに格納する
+			fmt.Println("商品単体ページ： ", Product)
+		} else {
 			continue
 		}
-
-		fmt.Println(Product)
 	}
 
+	// TODO Dealの商品まとめでDBに保存する処理
+	// Dealページの抽出
+	for k, v := range productURLS {
+		fmt.Println("Key: ", k)
+		for _, value := range v {
+			DealProduct, _ := ab.ProductGetHTMLtags(value)
+			time.Sleep(sleepDuration)
+
+			fmt.Println("/dealのページの商品一覧: ", DealProduct)
+		}
+	}
 }
