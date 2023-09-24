@@ -51,7 +51,7 @@ func (ab *AmazonBrowser) TimesalePage() ([]string, []string, error) {
 	var topDealUrls []string
 	viewIndex := 0
 
-	for len(topProductUrls) < 200 {
+	for len(topProductUrls) < 2000 {
 		pageURL := fmt.Sprintf("https://www.amazon.co.jp/gp/goldbox?viewIndex=%d", viewIndex)
 		ab.Page.MustNavigate(pageURL)
 		ab.Page.MustWaitLoad()
@@ -72,19 +72,19 @@ func (ab *AmazonBrowser) TimesalePage() ([]string, []string, error) {
 			case strings.Contains(*url, "/dp") && !contains(topProductUrls, *url):
 				topProductUrls = append(topProductUrls, *url)
 			case strings.Contains(*url, "/deal") && !contains(topDealUrls, *url):
-				if len(topDealUrls) < 10 { // この条件を追加して、topDealUrlsの長さが10未満の場合のみ追加します
+				if len(topDealUrls) < 20 { // この条件を追加して、topDealUrlsの長さが10未満の場合のみ追加します
 					topDealUrls = append(topDealUrls, *url)
 				}
 			}
 
 			// 10件のtopDealUrlsに達したら、ループを終了します
-			if len(topDealUrls) >= 10 {
+			if len(topDealUrls) >= 20 {
 				break
 			}
 		}
 
 		// 10件のtopDealUrlsに達したら、外部ループも終了します
-		if len(topDealUrls) >= 10 {
+		if len(topDealUrls) >= 20 {
 			break
 		}
 
@@ -196,6 +196,22 @@ func (ab *AmazonBrowser) ProductGetHTMLtags(url string) (ProductPage, error) {
 	}
 	descriptionText, _ := extractProductDescription()
 
+	// レビューを抽出
+	extractProductReview := func() (string, error) {
+		ReviewT, err := ab.Page.ElementX(`//div[contains(@class, 'reviewText') or contains(@class, 'review-text-content')]`)
+		if err != nil {
+			return "レビューなし", err
+		}
+		ReviewText := ReviewT.MustText()
+
+		if len(ReviewText) > 0 {
+			return ReviewText, nil
+		}
+		return "レビューなし", nil
+	}
+	reviewText, _ := extractProductReview()
+
+	// structでデータオブジェクト定義
 	ab.Product = ProductPage{
 		ASIN:               asin,
 		ProductName:        h1Text,
@@ -205,6 +221,7 @@ func (ab *AmazonBrowser) ProductGetHTMLtags(url string) (ProductPage, error) {
 		Price:              priceText,
 		ProductDescription: descriptionText,
 		Zaiko:              priceOfftext != "" || priceText != "",
+		Review:             reviewText,
 	}
 
 	return ab.Product, nil
