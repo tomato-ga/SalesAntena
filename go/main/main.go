@@ -43,7 +43,14 @@ func main() {
 			}
 
 			// TODO 商品単体ページの情報を一つずつDBに格納する
-			fmt.Println("商品単体ページ： ", Product)
+			fmt.Println("商品単体ページ： ", Product.ProductName)
+
+			// DynamoDBに保存する
+			err = headless.PutItemtoDynamoDB(Product)
+			if err != nil {
+				fmt.Println("DynamoDBの保存でエラーが出ました", err)
+			}
+
 		}
 	}
 
@@ -53,10 +60,18 @@ func main() {
 		fmt.Println("Key: ", k)
 		for _, value := range v {
 			DealProduct, err := ab.ProductGetHTMLtags(value)
+			DealProduct.DealURL = k
+
 			if err != nil {
 				fmt.Println("Error in ProductGetHTMLtags for DealProduct:", err)
 			}
 			fmt.Println("/dealのページの商品一覧: ", DealProduct)
+
+			// DynamoDBに保存する
+			err = headless.PutItemtoDynamoDB(DealProduct)
+			if err != nil {
+				fmt.Println("Deal商品のDynamoDBの保存でエラーがでました", err)
+			}
 		}
 	}
 }

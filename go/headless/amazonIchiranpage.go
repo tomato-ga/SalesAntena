@@ -27,6 +27,7 @@ type ProductPage struct {
 	ProductDescription string
 	Zaiko              bool
 	Review             string
+	DealURL            string
 }
 
 func NewAmazonBrowser() (*AmazonBrowser, error) {
