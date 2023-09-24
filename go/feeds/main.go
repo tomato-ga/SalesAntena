@@ -12,14 +12,14 @@ func main() {
 	var articles []ArticleDetails
 
 	for feedURL, config := range RssListsMap {
-		limitcount := 0
+		// limitcount := 0
 
 		feed, _ := fp.ParseURL(feedURL)
 
 		for _, item := range feed.Items {
-			if limitcount >= 3 {
-				break
-			}
+			// if limitcount >= 3 {
+			// 	break
+			// }
 
 			// URLからコンテンツを抽出する
 			doc, rawContent := extractContentFromURL(item.Link, config)
@@ -48,7 +48,7 @@ func main() {
 			articles = append(articles, article)
 
 			// カウント追加
-			limitcount++
+			// limitcount++
 		}
 	}
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"Salesscrape/headless"
 	"fmt"
 	"strings"
 )
@@ -9,11 +8,7 @@ import (
 func main() {
 	fmt.Println("---スタート---")
 
-	ab, err := headless.NewAmazonBrowser()
-	if err != nil {
-		fmt.Println("Error create AmazonBrowser", err)
-		return
-	}
+	ab := NewAmazonBrowser()
 
 	topProductUrls, topDealUrls, err := ab.TimesalePage()
 	if err != nil {
@@ -44,11 +39,9 @@ func main() {
 			fmt.Println("商品単体ページ： ", Product.ProductName)
 
 			// DynamoDBに保存する
-			err = headless.PutItemtoDynamoDB(Product)
 			if err != nil {
 				fmt.Println("DynamoDBの保存でエラーが出ました", err)
 			}
-
 		}
 	}
 
@@ -65,12 +58,9 @@ func main() {
 			fmt.Println("/dealのページの商品一覧: ", DealProduct)
 
 			// DynamoDBに保存する
-			err = headless.PutItemtoDynamoDB(DealProduct)
 			if err != nil {
 				fmt.Println("Deal商品のDynamoDBの保存でエラーがでました", err)
 			}
 		}
 	}
 }
-
-// TODO 商品単体ページとDealページは別ファイルで実行するのがよさそう

@@ -28,27 +28,27 @@ type FeedConfig struct {
 }
 
 var RssListsMap = map[string]FeedConfig{
-	// "https://webtokubai.blog.fc2.com/?xml": {
-	// 	Selector:      []string{"div.section"},
-	// 	RemoveText:    []string{"⇒", "blogranking", "ブログランキング"},
-	// 	RemoveDiv:     []string{"div.entry-footer"},
-	// 	RemoveAllText: []string{"この商品を楽天市場で探す"},
-	// },
-	// "https://gekiyasu-gekiyasu.doorblog.jp/index.rdf": {
-	// 	Selector:   []string{"div.main", "div.mainmore"}, // div.mainmoreというのが存在するので、Selectorもスライスで管理がよさそう
-	// 	RemoveText: []string{"人気ブログランキング"},
-	// 	RemoveDiv:  []string{""},
-	// },
-	// "https://tokkataro.blog.jp/atom.xml": {
-	// 	Selector:   []string{"div.article-body"},
-	// 	RemoveText: []string{"●楽天市場で同じアイテムを探す", "●Yahoo!ショッピングで同じアイテムを探す", "●他の特価品を探す(ブログランキング)", "⇒激安特価！(blogranking)"},
-	// 	RemoveDiv:  []string{""},
-	// },
-	// "http://buy.livedoor.biz/index.rdf": {
-	// 	Selector:   []string{"div.main"}, // div.mainが二つある
-	// 	RemoveText: []string{"適用", "Tweet"},
-	// 	RemoveDiv:  []string{"button", "iframe"},
-	// },
+	"https://webtokubai.blog.fc2.com/?xml": {
+		Selector:      []string{"div.section"},
+		RemoveText:    []string{"⇒", "blogranking", "ブログランキング"},
+		RemoveDiv:     []string{"div.entry-footer"},
+		RemoveAllText: []string{"この商品を楽天市場で探す"},
+	},
+	"https://gekiyasu-gekiyasu.doorblog.jp/index.rdf": {
+		Selector:   []string{"div.main", "div.mainmore"}, // div.mainmoreというのが存在するので、Selectorもスライスで管理がよさそう
+		RemoveText: []string{"人気ブログランキング"},
+		RemoveDiv:  []string{""},
+	},
+	"https://tokkataro.blog.jp/atom.xml": {
+		Selector:   []string{"div.article-body"},
+		RemoveText: []string{"●楽天市場で同じアイテムを探す", "●Yahoo!ショッピングで同じアイテムを探す", "●他の特価品を探す(ブログランキング)", "⇒激安特価！(blogranking)"},
+		RemoveDiv:  []string{""},
+	},
+	"http://buy.livedoor.biz/index.rdf": {
+		Selector:   []string{"div.main"}, // div.mainが二つある
+		RemoveText: []string{"適用", "Tweet"},
+		RemoveDiv:  []string{"button", "iframe"},
+	},
 	"https://iitokimowaruitokimo.com/feed": {
 		Selector:      []string{"div.entry-content"},
 		RemoveText:    []string{""},
